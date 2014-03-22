@@ -126,7 +126,7 @@
 #% key: moisture_1h
 #% type: string
 #% required: no
-#% multiple: no
+#% multiple: yes
 #% key_desc: name
 #% label: Raster map containing the 1-hour fuel moisture (%)
 #% description: Name of an existing raster map layer in the user's current mapset search path containing the 1-hour (<.25") fuel moisture (percentage content multiplied by 100).
@@ -136,7 +136,7 @@
 #% key: moisture_10h
 #% type: string
 #% required: no
-#% multiple: no
+#% multiple: yes
 #% key_desc: name
 #% label: Raster map containing the 10-hour fuel moisture (%)
 #% description: Name of an existing raster map layer in the user's current mapset search path containing the 10-hour (.25-1") fuel moisture (percentage content multiplied by 100).
@@ -146,7 +146,7 @@
 #% key: moisture_100h
 #% type: string
 #% required: no
-#% multiple: no
+#% multiple: yes
 #% key_desc: name
 #% label: Raster map containing the 100-hour fuel moisture (%)
 #% description: Name of an existing raster map layer in the user's current mapset search path containing the 100-hour (1-3") fuel moisture (percentage content multiplied by 100).
@@ -156,7 +156,7 @@
 #% key: moisture_live
 #% type: string
 #% required: yes
-#% multiple: no
+#% multiple: yes
 #% key_desc: name
 #% label: Raster map containing live fuel moisture (%)
 #% description: Name of an existing raster map layer in the user's current mapset search path containing live (herbaceous) fuel moisture (percentage content multiplied by 100).
@@ -166,7 +166,7 @@
 #% key: velocity
 #% type: string
 #% required: no
-#% multiple: no
+#% multiple: yes
 #% key_desc: name
 #% description: Name of an existing raster map layer in the user's current mapset search path containing wind velocities at half of the average flame height (feet/minute).
 #% gisprompt: old,cell,raster
@@ -175,7 +175,7 @@
 #% key: direction
 #% type: string
 #% required: no
-#% multiple: no
+#% multiple: yes
 #% key_desc: name
 #% label: Name of raster map containing wind directions (degree)
 #% description: Name of an existing raster map layer in the user's current mapset search path containing wind direction, clockwise from north (degree).
@@ -212,11 +212,17 @@
 #% gisprompt: old,cell,raster
 #% guisection: Spotting
 #%end
-
+#%option
+#% key: speed
+#% type: string
+#% required: no
+#% multiple: no
+#% key_desc: name
+#% description: Name of an existing raster map layer in the user's current mapset search path containing wind velocities at half of the average flame height (feet/minute).
+#% gisprompt: old,cell,raster
+#%end
 
 # description: Prefix for output raster maps (.base, .max, .maxdir, .spotdist)
-
-
 
 # -*- coding: utf-8 -*-
 
@@ -227,11 +233,21 @@ Created on Wed Mar 19 20:59:06 2014
 """
 
 import sys
-from collections import namedtuple
 
 import grass.script.core as gcore
+from grass.script.core import run_command, write_command
+
+# print-only version of run_command for debugging
+#def run_command(*args, **kwargs):
+#    command = ''
+#    for arg in args:
+#        command += arg + ' '
+#    for key, value in kwargs.iteritems():
+#        command += key + '=' + str(value) + ' '
+#    print command
 
 
+# this has much simpler solution using concat, set and sorted
 def determine_simulation_times(time_step, max_time, change_times):
     """
     >>> determine_simulation_times(2, 9, [0, 3, 5])
@@ -258,7 +274,6 @@ def determine_simulation_times(time_step, max_time, change_times):
     current_change_time_index = 0
     next_change_time = change_times[current_change_time_index + 1]
     while current_time < max_time:
-        #print next_change_time, current_time, time_step, current_time + time_step
         if next_change_time > current_time and \
            next_change_time < current_time + time_step:
             simulation_times.append(next_change_time)
@@ -370,6 +385,7 @@ def format_order(number, zeros):
     """
     return str(number).zfill(zeros)
 
+
 def output_names_for_intervals(basename, intervals):
     """
     >>> output_names_for_intervals('fire', [(0, 4), (4, 5), (5, 8)])
@@ -388,7 +404,8 @@ def output_names_for_intervals(basename, intervals):
         names.append(basename + '_' + format_order(interval[1], lenght))
     return names
 
-#
+
+# named tuple version of the class bellow
 #FireSimulationParams = namedtuple('FireSimulationParams',
 #                                  'model moistures_live '
 #                                  'moistures_1h moistures_10h moistures_100h '
@@ -414,28 +431,55 @@ class FireSimulationParams:
         self.start_raster = start_raster
 
     def assert_not_none_attributes(self):
+        """Check if all attributes are set (testing against None)"""
         for key, value in self.__dict__.items():
             if not key.startswith("_"):
                 assert value is not None, "%s is None" % key
 
 
-def simulate_fire(params, simulation_intervals, data_indexes, outputs):    
+def simulate_fire(params, simulation_intervals, data_indexes, outputs):
     """
-    >>> n = ['a' , 'b', 'c']
-    >>> o = ['i' , 'j', 'k', 'l']
-    >>> params = FireSimulationParams(model='m', moistures_live=n, moistures_1h=n, moistures_10h=n, moistures_100h=n, wind_directions=n, wind_velocities=n, start_raster='x', slope='o', aspect='p', elevation='q')
-    >>> simulate_fire(params, [(0, 1), (1, 3), (3, 8), (8, 9)], [0, 1, 1, 2], o)
+    n = ['a' , 'b', 'c']
+    o = ['i' , 'j', 'k', 'l']
+    params = FireSimulationParams(model='m', moistures_live=n, moistures_1h=n, moistures_10h=n, moistures_100h=n, wind_directions=n, wind_velocities=n, start_raster='x', slope='o', aspect='p', elevation='q')
+    simulate_fire(params, [(0, 1), (1, 3), (3, 8), (8, 9)], [0, 1, 1, 2], o)
     """
     start_raster = params.start_raster
+    ros_basename = 'rfirespread_rros_out'
+    ros_base = ros_basename + '.base'
+    ros_max = ros_basename + '.max'
+    ros_maxdir = ros_basename + '.maxdir'
     for index, interval in enumerate(simulation_intervals):
-        print index, interval, params.moistures_live[data_indexes[index]]
-#        gcore.run_command('r.ros', model=params.model,
-#                          moisture_1h=params.moistures_1h, moisture_10h=params.moistures_10h, moisture_100h=params.moistures_100h,
-#                          moisture_live=params.moistures_live,
-#                          slope=params.slope, aspect=params.aspect,
-#                          elevation=params.elevation,
-#                          output='rros_out')
-#        gcore.run_command('r.spread', max=ros_max, dir=ros_maxdir, base=ros_base, start=start_raster, output=outputs[index])
+        # print ">>>>>>>>>", index, interval, params.model, params.moistures_100h[data_indexes[index]], params.wind_directions[data_indexes[index]], params.wind_velocities[data_indexes[index]]
+        # TODO: change the print to message
+        ret = run_command('r.ros', model=params.model,
+                          moisture_1h=params.moistures_1h[data_indexes[index]], moisture_10h=params.moistures_10h[data_indexes[index]], moisture_100h=params.moistures_100h[data_indexes[index]],
+                          moisture_live=params.moistures_live[data_indexes[index]],
+                          slope=params.slope, aspect=params.aspect,
+                          elevation=params.elevation,
+                          direction=params.wind_directions[data_indexes[index]], velocity=params.wind_velocities[data_indexes[index]],
+                          output=ros_basename)
+        if ret != 0:
+            gcore.fatal(_("r.ros failed. Please check above error messages."))
+        ret = run_command('r.spread', max=ros_max, dir=ros_maxdir, base=ros_base, start=start_raster, output=outputs[index], init_time=interval[0], lag=interval[1])
+        if ret != 0:
+            gcore.fatal(_("r.spread failed. Please check above error messages."))
+        ret = run_command('g.remove', rast=[ros_base, ros_max, ros_maxdir])
+        if ret != 0:
+            gcore.fatal(_("g.remove failed when cleaning after r.ros and r.spread."
+                          " This might mean the error of programmer or unexpected behavior of one of the modules."
+                          " Please check above error messages."))
+        ret = run_command('r.null', map=outputs[index], setnull=0)
+        if ret != 0:
+            gcore.fatal(_("r.null failed. Please check above error messages."))
+        ret = write_command('r.colors', map=outputs[index], rules='-',
+                            stdin="""
+                            0% 50:50:50
+                            60% yellow
+                            100% red
+                            """)
+        if ret != 0:
+            gcore.fatal(_("r.colors failed. Please check above error messages."))
         start_raster = outputs[index]
 
 
@@ -445,31 +489,49 @@ def main():
 
     options, flags = gcore.parser()
 
-    sim_params.model = options['model'].split(',')
+    sim_params.model = options['model']
     sim_params.moistures_live = options['moisture_live'].split(',')
     sim_params.moistures_1h = options['moisture_1h'].split(',')
     sim_params.moistures_10h = options['moisture_10h'].split(',')
     sim_params.moistures_100h = options['moisture_100h'].split(',')
     sim_params.wind_directions = options['direction'].split(',')
-    sim_params.wind_velocities = options['velocity'].split(',')
+    sim_params.wind_velocities = options['speed'].split(',')
+
+    sim_params.slope = options['slope']
+    sim_params.aspect = options['aspect']
+    sim_params.elevation = options['elevation']
+
+    sim_params.start_raster = options['start']
+    basename = options['output']
 
     # TODO: handle no dead moistures
     # TODO: add handling of 0 (or 1?) at the beginning of times
     # TODO: change name of lag?
     # TODO: check if times and maps has the same sizes
     # TODO: check if multiple things are multiple
+    # TODO: resolve inconsitency in speed vs velocity
+    # TODO: create convention for plural for options with multiple
 
     change_times = [int(i) for i in options['times'].split(',')]
     max_time = int(options['lag'])
     time_step = int(options['time_step'])
+
+    number_of_changes = len(change_times)
+    for i in [sim_params.moistures_live, sim_params.moistures_1h, sim_params.moistures_10h, sim_params.moistures_100h, sim_params.wind_directions, sim_params.wind_velocities]:
+        if len(i) != number_of_changes:
+            gcore.fatal(_("Lenghts does not match"))
+            # TODO: make this one by one to make it informative
 
     export_times = range(0, max_time + 1, time_step)
     simulation_times = sorted(set(export_times + change_times))
 
     simulation_intervals = times_to_intervals(simulation_times)
     data_indexes = data_indexes_for_intervals(simulation_intervals, change_times)
+    outputs = output_names_for_intervals(basename, simulation_intervals)
 
     sim_params.assert_not_none_attributes()
+
+    simulate_fire(sim_params, simulation_intervals, data_indexes, outputs=outputs)
 
     return 0
 
@@ -480,4 +542,3 @@ if __name__ == "__main__":
         doctest.testmod()
     else:
         sys.exit(main())
-
