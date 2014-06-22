@@ -450,16 +450,27 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
     ros_base = ros_basename + '.base'
     ros_max = ros_basename + '.max'
     ros_maxdir = ros_basename + '.maxdir'
+    rros_params = dict(model=params.model,
+                       slope=params.slope, aspect=params.aspect,
+                       elevation=params.elevation,
+                       output=ros_basename)
+
     for index, interval in enumerate(simulation_intervals):
         # print ">>>>>>>>>", index, interval, params.model, params.moistures_100h[data_indexes[index]], params.wind_directions[data_indexes[index]], params.wind_velocities[data_indexes[index]]
         # TODO: change the print to message
-        ret = run_command('r.ros', model=params.model,
-                          moisture_1h=params.moistures_1h[data_indexes[index]], moisture_10h=params.moistures_10h[data_indexes[index]], moisture_100h=params.moistures_100h[data_indexes[index]],
-                          moisture_live=params.moistures_live[data_indexes[index]],
-                          slope=params.slope, aspect=params.aspect,
-                          elevation=params.elevation,
-                          direction=params.wind_directions[data_indexes[index]], velocity=params.wind_velocities[data_indexes[index]],
-                          output=ros_basename)
+        rros_params['moisture_live'] = params.moistures_live[data_indexes[index]]
+        if params.moistures_1h:
+            rros_params['moisture_1h'] = params.moistures_1h[data_indexes[index]]
+        if params.moistures_10h:
+            rros_params['moisture_10h'] = params.moistures_10h[data_indexes[index]]
+        if params.moistures_100h:
+            rros_params['moisture_100h'] = params.moistures_100h[data_indexes[index]]
+        if params.wind_directions:
+            rros_params['direction'] = params.wind_directions[data_indexes[index]]
+        if params.wind_velocities:
+            rros_params['velocity'] = params.wind_velocities[data_indexes[index]]
+
+        ret = run_command('r.ros', **rros_params)
         if ret != 0:
             gcore.fatal(_("r.ros failed. Please check above error messages."))
         ret = run_command('r.spread',
@@ -467,6 +478,7 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
                           start=start_raster, output=outputs[index],
                           init_time=interval[0], lag=interval[1] - interval[0])
         print "interval =", interval
+        print "difference =", interval[1] - interval[0]
         print gcore.read_command('r.info', map=outputs[index])
         if ret != 0:
             gcore.fatal(_("r.spread failed. Please check above error messages."))
@@ -497,11 +509,26 @@ def main():
 
     sim_params.model = options['model']
     sim_params.moistures_live = options['moisture_live'].split(',')
-    sim_params.moistures_1h = options['moisture_1h'].split(',')
-    sim_params.moistures_10h = options['moisture_10h'].split(',')
-    sim_params.moistures_100h = options['moisture_100h'].split(',')
-    sim_params.wind_directions = options['direction'].split(',')
-    sim_params.wind_velocities = options['speed'].split(',')
+    if options['moisture_1h']:
+        sim_params.moistures_1h = options['moisture_1h'].split(',')
+    else:
+        sim_params.moistures_1h = None
+    if options['moisture_10h']:
+        sim_params.moistures_10h = options['moisture_10h'].split(',')
+    else:
+        sim_params.moistures_10h = None
+    if options['moisture_100h']:
+        sim_params.moistures_100h = options['moisture_100h'].split(',')
+    else:
+        sim_params.moistures_100h = None
+    if options['direction']:
+        sim_params.wind_directions = options['direction'].split(',')
+    else:
+        sim_params.wind_directions = None
+    if options['speed']:
+        sim_params.wind_velocities = options['speed'].split(',')
+    else:
+        sim_params.wind_velocities = None
 
     sim_params.slope = options['slope']
     sim_params.aspect = options['aspect']
@@ -524,7 +551,8 @@ def main():
 
     number_of_changes = len(change_times)
     for i in [sim_params.moistures_live, sim_params.moistures_1h, sim_params.moistures_10h, sim_params.moistures_100h, sim_params.wind_directions, sim_params.wind_velocities]:
-        if len(i) != number_of_changes:
+        # here allowing None as valid state
+        if i is not None and len(i) != number_of_changes:
             gcore.fatal(_("Lenghts does not match:"
                           " times={t}, maps are {i}").format(t=number_of_changes,
                                                              i=i))
@@ -537,7 +565,8 @@ def main():
     data_indexes = data_indexes_for_intervals(simulation_intervals, change_times)
     outputs = output_names_for_intervals(basename, simulation_intervals)
 
-    sim_params.assert_not_none_attributes()
+    # TODO: fix for r.ros/r.spread acceptable None/empty attributes
+    # sim_params.assert_not_none_attributes()
 
     simulate_fire(sim_params, simulation_intervals, data_indexes, outputs=outputs)
 
