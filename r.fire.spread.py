@@ -445,6 +445,7 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
     simulate_fire(params, [(0, 1), (1, 3), (3, 8), (8, 9)], [0, 1, 1, 2], o)
     """
     start_raster = params.start_raster
+    # TODO: clean the tmp maps: g.mremove rast="rfirespread_rros_out*" -f
     ros_basename = 'rfirespread_rros_out'
     ros_base = ros_basename + '.base'
     ros_max = ros_basename + '.max'
@@ -461,7 +462,12 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
                           output=ros_basename)
         if ret != 0:
             gcore.fatal(_("r.ros failed. Please check above error messages."))
-        ret = run_command('r.spread', max=ros_max, dir=ros_maxdir, base=ros_base, start=start_raster, output=outputs[index], init_time=interval[0], lag=interval[1])
+        ret = run_command('r.spread',
+                          max=ros_max, dir=ros_maxdir, base=ros_base,
+                          start=start_raster, output=outputs[index],
+                          init_time=interval[0], lag=interval[1] - interval[0])
+        print "interval =", interval
+        print gcore.read_command('r.info', map=outputs[index])
         if ret != 0:
             gcore.fatal(_("r.spread failed. Please check above error messages."))
         ret = run_command('g.remove', rast=[ros_base, ros_max, ros_maxdir])
@@ -519,7 +525,9 @@ def main():
     number_of_changes = len(change_times)
     for i in [sim_params.moistures_live, sim_params.moistures_1h, sim_params.moistures_10h, sim_params.moistures_100h, sim_params.wind_directions, sim_params.wind_velocities]:
         if len(i) != number_of_changes:
-            gcore.fatal(_("Lenghts does not match"))
+            gcore.fatal(_("Lenghts does not match:"
+                          " times={t}, maps are {i}").format(t=number_of_changes,
+                                                             i=i))
             # TODO: make this one by one to make it informative
 
     export_times = range(0, max_time + 1, time_step)
