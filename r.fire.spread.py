@@ -455,6 +455,7 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
                        elevation=params.elevation,
                        output=ros_basename)
 
+    first_run = True
     for index, interval in enumerate(simulation_intervals):
         # print ">>>>>>>>>", index, interval, params.model, params.moistures_100h[data_indexes[index]], params.wind_directions[data_indexes[index]], params.wind_velocities[data_indexes[index]]
         # TODO: change the print to message
@@ -473,10 +474,16 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
         ret = run_command('r.ros', **rros_params)
         if ret != 0:
             gcore.fatal(_("r.ros failed. Please check above error messages."))
+        if first_run:
+            rspread_flags = ''
+            first_run = False
+        else:
+            rspread_flags = 'i'
         ret = run_command('r.spread',
                           max=ros_max, dir=ros_maxdir, base=ros_base,
                           start=start_raster, output=outputs[index],
-                          init_time=interval[0], lag=interval[1] - interval[0])
+                          init_time=interval[0], lag=interval[1] - interval[0],
+                          flags=rspread_flags)
         print "interval =", interval
         print "difference =", interval[1] - interval[0]
         print gcore.read_command('r.info', map=outputs[index])
