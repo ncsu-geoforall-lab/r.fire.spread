@@ -38,26 +38,6 @@
 #% guisection: Input maps
 #%end
 #%option
-#% key: w_speed
-#% type: string
-#% required: no
-#% multiple: no
-#% label: Raster map containing midflame wind speed (ft/min, required with -s)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing wind velocities at half of the average flame height (feet/minute).
-#% gisprompt: old,cell,raster
-#% guisection: Spotting
-#%end
-#%option
-#% key: f_mois
-#% type: string
-#% required: no
-#% multiple: no
-#% label: Raster map containing fine fuel moisture of the cell receiving a spotting firebrand (%, required with -s)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing the 1-hour (<.25") fuel moisture (percentage content multiplied by 100).
-#% gisprompt: old,cell,raster
-#% guisection: Spotting
-#%end
-#%option
 #% key: least_size
 #% type: string
 #% required: no
@@ -86,7 +66,7 @@
 #% description: Times of changes.
 #%end
 #%option
-#% key: lag
+#% key: end_time
 #% type: string
 #% required: yes
 #% multiple: no
@@ -111,7 +91,6 @@
 #% gisprompt: new,cell,raster
 #% guisection: Output maps
 #%end
-
 #%option
 #% key: model
 #% type: string
@@ -160,15 +139,6 @@
 #% key_desc: name
 #% label: Raster map containing live fuel moisture (%)
 #% description: Name of an existing raster map layer in the user's current mapset search path containing live (herbaceous) fuel moisture (percentage content multiplied by 100).
-#% gisprompt: old,cell,raster
-#%end
-#%option
-#% key: velocity
-#% type: string
-#% required: no
-#% multiple: yes
-#% key_desc: name
-#% description: Name of an existing raster map layer in the user's current mapset search path containing wind velocities at half of the average flame height (feet/minute).
 #% gisprompt: old,cell,raster
 #%end
 #%option
@@ -544,16 +514,15 @@ def main():
     sim_params.start_raster = options['start']
     basename = options['output']
 
-    # TODO: handle no dead moistures
     # TODO: add handling of 0 (or 1?) at the beginning of times
-    # TODO: change name of lag?
     # TODO: check if times and maps has the same sizes
     # TODO: check if multiple things are multiple
-    # TODO: resolve inconsitency in speed vs velocity
+    # TODO: resolve inconsitency in speed vs velocity in code
+    # TODO: resolve inconsitency in speed vs velocity r.ros and r.spread
     # TODO: create convention for plural for options with multiple
 
     change_times = [int(i) for i in options['times'].split(',')]
-    max_time = int(options['lag'])
+    max_time = int(options['end_time'])
     time_step = int(options['time_step'])
 
     number_of_changes = len(change_times)
