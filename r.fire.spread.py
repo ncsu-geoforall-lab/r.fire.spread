@@ -3,7 +3,7 @@
 #
 # MODULE:       r.fire.spread
 # AUTHOR(S):    Vaclav Petras
-# PURPOSE:      Wrapper for r.ros and r.spread
+# PURPOSE:      Wrapper for r.ros and r.spread focused on wildfire simulation
 # COPYRIGHT:    (C) 2014 by Vaclav Petras, and the GRASS Development Team
 #
 #  This program is free software; you can redistribute it and/or modify
@@ -20,7 +20,7 @@
 
 #%module
 #% label: Simulates elliptically anisotropic spread.
-#% description: Generates a raster map of the cumulative time of spread, given raster maps containing the rates of spread (ROS), the ROS directions and the spread origins. It optionally produces raster maps to contain backlink UTM coordinates for tracing spread paths. Usable for fire spread simulations.
+#% description: Generates a raster map of the cumulative time of spread, given raster maps containing the rates of spread (ROS), the ROS directions and the spread origins. It optionally produces raster maps to contain backlink UTM coordinates for tracing spread paths. Usable for fire spread simulations. Wrapper for r.ros and r.spread focused on wildfire simulation
 #% keywords: raster, fire, spread, hazard
 #%end
 #%flag
@@ -63,23 +63,25 @@
 #% required: yes
 #% multiple: yes
 #% key_desc: int (>= 0)
-#% description: Times of changes.
+#% label: Times of changes [minutes]
+#% description: Indicates the times when the change of input maps occurs starting with time 0. The length must me the same as the length of other multiple options
 #%end
 #%option
 #% key: end_time
 #% type: string
 #% required: yes
 #% multiple: no
-#% key_desc: int (>= 0)
-#% description: A non-negative integer specifying the simulating duration time lag (minutes). The default is infinite, but the program will terminate when the current geographic region/mask has been filled. It also controls the computational time, the shorter the time lag, the faster the program will run. Is required although is not for the r.spread.
+#% key_desc: int (> 0)
+#% label: A non-negative integer specifying the end time of simulation [minutes]
+#% description: Note that this option is required, although is not required for the r.spread module
 #%end
 #%option
 #% key: time_step
 #% type: string
 #% required: yes
 #% multiple: no
-#% key_desc: int (>= 0)
-#% description: Time interval of saving simulation results.
+#% key_desc: int (> 0)
+#% description: Time interval for saving simulation results.
 #%end
 #%option
 #% key: output
@@ -516,6 +518,12 @@ def main():
     else:
         sim_params.wind_velocities = None
 
+    if not sim_params.moistures_1h and not sim_params.moistures_10h and \
+       not sim_params.moistures_100h:
+        gcore.fatal(_("No dead fuel moisture is given."
+                      " At least one of the 1-h, 10-h, 100-h"
+                      " moisture layers is required."))
+
     sim_params.slope = options['slope']
     sim_params.aspect = options['aspect']
     sim_params.elevation = options['elevation']
@@ -539,6 +547,14 @@ def main():
     # TODO: resolve inconsitency in speed vs velocity r.ros and r.spread
     # TODO: create convention for plural for options with multiple
     # TODO: add advanced r.spread options
+    # TODO: handle non-zero start time
+    # TODO: change types of int options
+    # TODO: remove unused functions
+    # TODO: compute missing moisture_1h when doing spotting and other are available
+    # TODO: unique tmp map names and clean the map on error
+    # TODO: delete the maps which were not requested, perhaps create a flag
+    # TODO: reqister output as strds
+    # TODO: accept strds as input
 
     change_times = [int(i) for i in options['times'].split(',')]
     max_time = int(options['end_time'])
