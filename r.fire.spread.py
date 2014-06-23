@@ -192,8 +192,6 @@
 #% gisprompt: old,cell,raster
 #%end
 
-# description: Prefix for output raster maps (.base, .max, .maxdir, .spotdist)
-
 # -*- coding: utf-8 -*-
 
 """
@@ -387,7 +385,9 @@ class FireSimulationParams:
                  moistures_1h=None, moistures_10h=None, moistures_100h=None,
                  wind_directions=None, wind_velocities=None,
                  slope=None, aspect=None, elevation=None,
-                 start_raster=None):
+                 start_raster=None,
+                 spotting=None):
+        self.spotting = spotting
         self.model = model
         self.moistures_live = moistures_live
         self.moistures_1h = moistures_1h
@@ -416,14 +416,17 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
     """
     start_raster = params.start_raster
     # TODO: clean the tmp maps: g.mremove rast="rfirespread_rros_out*" -f
+    # r.ros output raster maps (.base, .max, .maxdir, .spotdist)
     ros_basename = 'rfirespread_rros_out'
     ros_base = ros_basename + '.base'
     ros_max = ros_basename + '.max'
     ros_maxdir = ros_basename + '.maxdir'
+    ros_spotdist = ros_basename + '.spotdist' if params.spotting else None
     rros_params = dict(model=params.model,
                        slope=params.slope, aspect=params.aspect,
                        elevation=params.elevation,
                        output=ros_basename)
+    rspread_params = dict(max=ros_max, dir=ros_maxdir, base=ros_base)
 
     first_run = True
     for index, interval in enumerate(simulation_intervals):
@@ -440,8 +443,8 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
             rros_params['direction'] = params.wind_directions[data_indexes[index]]
         if params.wind_velocities:
             rros_params['velocity'] = params.wind_velocities[data_indexes[index]]
-
-        ret = run_command('r.ros', **rros_params)
+        rros_flags = 's' if params.spotting else ''
+        ret = run_command('r.ros', rros_flags, **rros_params)
         if ret != 0:
             gcore.fatal(_("r.ros failed. Please check above error messages."))
         if first_run:
@@ -449,17 +452,23 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
             first_run = False
         else:
             rspread_flags = 'i'
-        ret = run_command('r.spread',
-                          max=ros_max, dir=ros_maxdir, base=ros_base,
-                          start=start_raster, output=outputs[index],
-                          init_time=interval[0], lag=interval[1] - interval[0],
-                          flags=rspread_flags)
-        print "interval =", interval
-        print "difference =", interval[1] - interval[0]
-        print gcore.read_command('r.info', map=outputs[index])
+        if params.spotting:
+            rspread_flags += 's'
+            rspread_params['spot_dist'] = ros_spotdist
+            rspread_params['w_speed'] = params.wind_velocities[data_indexes[index]]
+            rspread_params['f_mois'] = params.moistures_1h[data_indexes[index]]
+
+        rspread_params.update(dict(start=start_raster, output=outputs[index],
+                                   init_time=interval[0],
+                                   lag=interval[1] - interval[0]))
+        ret = run_command('r.spread', flags=rspread_flags, **rspread_params)
+
         if ret != 0:
             gcore.fatal(_("r.spread failed. Please check above error messages."))
-        ret = run_command('g.remove', rast=[ros_base, ros_max, ros_maxdir])
+        rast_to_remove = [ros_base, ros_max, ros_maxdir]
+        if params.spotting:
+            rast_to_remove.append(ros_spotdist)
+        ret = run_command('g.remove', rast=rast_to_remove)
         if ret != 0:
             gcore.fatal(_("g.remove failed when cleaning after r.ros and r.spread."
                           " This might mean the error of programmer or unexpected behavior of one of the modules."
@@ -511,6 +520,15 @@ def main():
     sim_params.aspect = options['aspect']
     sim_params.elevation = options['elevation']
 
+    sim_params.spotting = flags['s']
+    if sim_params.spotting and not sim_params.elevation:
+        gcore.fatal(_("Spotting requires elevation option"))
+    #elif not sim_params.spotting and sim_params.elevation:
+    #    gcore.message(_("Elevation option used but is ignored when no spotting"
+    #                    " is requested"))
+    if sim_params.spotting and not sim_params.moistures_1h:
+        gcore.fatal(_("Spotting requires moisture_1h option (fine fuel)"))
+
     sim_params.start_raster = options['start']
     basename = options['output']
 
@@ -520,6 +538,7 @@ def main():
     # TODO: resolve inconsitency in speed vs velocity in code
     # TODO: resolve inconsitency in speed vs velocity r.ros and r.spread
     # TODO: create convention for plural for options with multiple
+    # TODO: add advanced r.spread options
 
     change_times = [int(i) for i in options['times'].split(',')]
     max_time = int(options['end_time'])
