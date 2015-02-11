@@ -427,8 +427,12 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
     rros_params = dict(model=params.model,
                        slope=params.slope, aspect=params.aspect,
                        elevation=params.elevation,
-                       output=ros_basename)
-    rspread_params = dict(max=ros_max, dir=ros_maxdir, base=ros_base)
+                       base_ros=ros_base,
+                       max_ros=ros_max,
+                       direction_ros=ros_maxdir)
+    if ros_spotdist:
+        rros_params['spotting_distance'] = ros_spotdist
+    rspread_params = dict(max_ros=ros_max, direction_ros=ros_maxdir, base_ros=ros_base)
 
     first_run = True
     for index, interval in enumerate(simulation_intervals):
@@ -445,8 +449,8 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
             rros_params['direction'] = params.wind_directions[data_indexes[index]]
         if params.wind_velocities:
             rros_params['velocity'] = params.wind_velocities[data_indexes[index]]
-        rros_flags = 's' if params.spotting else ''
-        ret = run_command('r.ros', rros_flags, **rros_params)
+        ret = run_command('r.ros', **rros_params)
+
         if ret != 0:
             gcore.fatal(_("r.ros failed. Please check above error messages."))
         if first_run:
@@ -456,9 +460,9 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
             rspread_flags = 'i'
         if params.spotting:
             rspread_flags += 's'
-            rspread_params['spot_dist'] = ros_spotdist
-            rspread_params['w_speed'] = params.wind_velocities[data_indexes[index]]
-            rspread_params['f_mois'] = params.moistures_1h[data_indexes[index]]
+            rspread_params['spotting_distance'] = ros_spotdist
+            rspread_params['wind_speed'] = params.wind_velocities[data_indexes[index]]
+            rspread_params['fuel_moisture'] = params.moistures_1h[data_indexes[index]]
 
         rspread_params.update(dict(start=start_raster, output=outputs[index],
                                    init_time=interval[0],
@@ -470,7 +474,7 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
         rast_to_remove = [ros_base, ros_max, ros_maxdir]
         if params.spotting:
             rast_to_remove.append(ros_spotdist)
-        ret = run_command('g.remove', rast=rast_to_remove)
+        ret = run_command('g.remove', type='raster', name=rast_to_remove, flags='f')
         if ret != 0:
             gcore.fatal(_("g.remove failed when cleaning after r.ros and r.spread."
                           " This might mean the error of programmer or unexpected behavior of one of the modules."
