@@ -4,7 +4,7 @@
 # MODULE:       r.fire.spread
 # AUTHOR(S):    Vaclav Petras
 # PURPOSE:      Wrapper for r.ros and r.spread focused on wildfire simulation
-# COPYRIGHT:    (C) 2014 by Vaclav Petras, and the GRASS Development Team
+# COPYRIGHT:    (C) 2014-2021 by Vaclav Petras and the GRASS Development Team
 #
 #  This program is free software; you can redistribute it and/or modify
 #  it under the terms of the GNU General Public License as published by
@@ -18,183 +18,181 @@
 #
 ############################################################################
 
-#%module
-#% label: Simulates elliptically anisotropic spread.
-#% description: Generates a raster map of the cumulative time of spread, given raster maps containing the rates of spread (ROS), the ROS directions and the spread origins. It optionally produces raster maps to contain backlink UTM coordinates for tracing spread paths. Usable for fire spread simulations. Wrapper for r.ros and r.spread focused on wildfire simulation
-#% keywords: raster, fire, spread, hazard
-#%end
-#%flag
-#% key: s
-#% description: Consider spotting effect
-#% guisection: Spotting
-#%end
-#%option
-#% key: start
-#% type: string
-#% required: yes
-#% multiple: no
-#% description: Name of an existing raster map layer in the user's current mapset search path containing starting locations of the spread phenomenon. Any positive integers in this map are recognized as starting sources (seeds).
-#% gisprompt: old,cell,raster
-#% guisection: Input maps
-#%end
-#%option
-#% key: least_size
-#% type: string
-#% required: no
-#% multiple: no
-#% options: 3,5,7,9,11,13,15
-#% key_desc: odd int
-#% description: An odd integer ranging 3 - 15 indicating the basic sampling window size within which all cells will be considered to see whether they will be reached by the current spread cell. The default number is 3 which means a 3x3 window.
-#% guisection: Advanced
-#%end
-#%option
-#% key: comp_dens
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: decimal
-#% label: Sampling density for additional computing (range: 0.0 - 1.0 (0.5))
-#% description: A decimal number ranging 0.0 - 1.0 indicating additional sampling cells will be considered to see whether they will be reached by the current spread cell. The closer to 1.0 the decimal number is, the longer the program will run and the higher the simulation accuracy will be. The default number is 0.5.
-#% guisection: Advanced
-#%end
-#%option
-#% key: times
-#% type: string
-#% required: yes
-#% multiple: yes
-#% key_desc: int (>= 0)
-#% label: Times of changes [minutes]
-#% description: Indicates the times when the change of input maps occurs starting with time 0. The length must me the same as the length of other multiple options
-#%end
-#%option
-#% key: end_time
-#% type: string
-#% required: yes
-#% multiple: no
-#% key_desc: int (> 0)
-#% label: A non-negative integer specifying the end time of simulation [minutes]
-#% description: Note that this option is required, although is not required for the r.spread module
-#%end
-#%option
-#% key: time_step
-#% type: string
-#% required: yes
-#% multiple: no
-#% key_desc: int (> 0)
-#% description: Time interval for saving simulation results.
-#%end
-#%option
-#% key: output
-#% type: string
-#% required: yes
-#% multiple: no
-#% label: Raster map to contain output spread time (min)
-#% description: Name of the new raster map layer to contain the results of the cumulative spread time needed for a phenomenon to reach each cell from the starting sources (minutes).
-#% gisprompt: new,cell,raster
-#% guisection: Output maps
-#%end
-#%option
-#% key: model
-#% type: string
-#% required: yes
-#% multiple: no
-#% key_desc: name
-#% label: Raster map containing fuel models
-#% description: Name of an existing raster map layer in the user's current mapset search path containing the standard fuel models defined by the USDA Forest Service. Valid values are 1-13; other numbers are recognized as barriers by r.ros.
-#% gisprompt: old,cell,raster
-#%end
-#%option
-#% key: moisture_1h
-#% type: string
-#% required: no
-#% multiple: yes
-#% key_desc: name
-#% label: Raster map containing the 1-hour fuel moisture (%)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing the 1-hour (<.25") fuel moisture (percentage content multiplied by 100).
-#% gisprompt: old,cell,raster
-#%end
-#%option
-#% key: moisture_10h
-#% type: string
-#% required: no
-#% multiple: yes
-#% key_desc: name
-#% label: Raster map containing the 10-hour fuel moisture (%)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing the 10-hour (.25-1") fuel moisture (percentage content multiplied by 100).
-#% gisprompt: old,cell,raster
-#%end
-#%option
-#% key: moisture_100h
-#% type: string
-#% required: no
-#% multiple: yes
-#% key_desc: name
-#% label: Raster map containing the 100-hour fuel moisture (%)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing the 100-hour (1-3") fuel moisture (percentage content multiplied by 100).
-#% gisprompt: old,cell,raster
-#%end
-#%option
-#% key: moisture_live
-#% type: string
-#% required: yes
-#% multiple: yes
-#% key_desc: name
-#% label: Raster map containing live fuel moisture (%)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing live (herbaceous) fuel moisture (percentage content multiplied by 100).
-#% gisprompt: old,cell,raster
-#%end
-#%option
-#% key: direction
-#% type: string
-#% required: no
-#% multiple: yes
-#% key_desc: name
-#% label: Name of raster map containing wind directions (degree)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing wind direction, clockwise from north (degree).
-#% gisprompt: old,cell,raster
-#%end
-#%option
-#% key: slope
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: name
-#% label: Name of raster map containing slope (degree)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing topographic slope (degree).
-#% gisprompt: old,cell,raster
-#%end
-#%option
-#% key: aspect
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: name
-#% label: Raster map containing aspect (degree, CCW from E)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing topographic aspect, counterclockwise from east (GRASS convention) in degrees.
-#% gisprompt: old,cell,raster
-#%end
-#%option
-#% key: elevation
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: name
-#% label: Raster map containing elevation (m, required with -s)
-#% description: Name of an existing raster map layer in the user's current mapset search path containing elevation (meters). Option is required from spotting distance computation (when -s flag is enabled)
-#% gisprompt: old,cell,raster
-#% guisection: Spotting
-#%end
-#%option
-#% key: speed
-#% type: string
-#% required: no
-#% multiple: no
-#% key_desc: name
-#% description: Name of an existing raster map layer in the user's current mapset search path containing wind velocities at half of the average flame height (feet/minute).
-#% gisprompt: old,cell,raster
-#%end
-
-# -*- coding: utf-8 -*-
+# %module
+# % label: Simulates elliptically anisotropic spread.
+# % description: Generates a raster map of the cumulative time of spread, given raster maps containing the rates of spread (ROS), the ROS directions and the spread origins. It optionally produces raster maps to contain backlink UTM coordinates for tracing spread paths. Usable for fire spread simulations. Wrapper for r.ros and r.spread focused on wildfire simulation
+# % keywords: raster, fire, spread, hazard
+# %end
+# %flag
+# % key: s
+# % description: Consider spotting effect
+# % guisection: Spotting
+# %end
+# %option
+# % key: start
+# % type: string
+# % required: yes
+# % multiple: no
+# % description: Name of an existing raster map layer in the user's current mapset search path containing starting locations of the spread phenomenon. Any positive integers in this map are recognized as starting sources (seeds).
+# % gisprompt: old,cell,raster
+# % guisection: Input maps
+# %end
+# %option
+# % key: least_size
+# % type: string
+# % required: no
+# % multiple: no
+# % options: 3,5,7,9,11,13,15
+# % key_desc: odd int
+# % description: An odd integer ranging 3 - 15 indicating the basic sampling window size within which all cells will be considered to see whether they will be reached by the current spread cell. The default number is 3 which means a 3x3 window.
+# % guisection: Advanced
+# %end
+# %option
+# % key: comp_dens
+# % type: string
+# % required: no
+# % multiple: no
+# % key_desc: decimal
+# % label: Sampling density for additional computing (range: 0.0 - 1.0 (0.5))
+# % description: A decimal number ranging 0.0 - 1.0 indicating additional sampling cells will be considered to see whether they will be reached by the current spread cell. The closer to 1.0 the decimal number is, the longer the program will run and the higher the simulation accuracy will be. The default number is 0.5.
+# % guisection: Advanced
+# %end
+# %option
+# % key: times
+# % type: string
+# % required: yes
+# % multiple: yes
+# % key_desc: int (>= 0)
+# % label: Times of changes [minutes]
+# % description: Indicates the times when the change of input maps occurs starting with time 0. The length must me the same as the length of other multiple options
+# %end
+# %option
+# % key: end_time
+# % type: string
+# % required: yes
+# % multiple: no
+# % key_desc: int (> 0)
+# % label: A non-negative integer specifying the end time of simulation [minutes]
+# % description: Note that this option is required, although is not required for the r.spread module
+# %end
+# %option
+# % key: time_step
+# % type: string
+# % required: yes
+# % multiple: no
+# % key_desc: int (> 0)
+# % description: Time interval for saving simulation results.
+# %end
+# %option
+# % key: output
+# % type: string
+# % required: yes
+# % multiple: no
+# % label: Raster map to contain output spread time (min)
+# % description: Name of the new raster map layer to contain the results of the cumulative spread time needed for a phenomenon to reach each cell from the starting sources (minutes).
+# % gisprompt: new,cell,raster
+# % guisection: Output maps
+# %end
+# %option
+# % key: model
+# % type: string
+# % required: yes
+# % multiple: no
+# % key_desc: name
+# % label: Raster map containing fuel models
+# % description: Name of an existing raster map layer in the user's current mapset search path containing the standard fuel models defined by the USDA Forest Service. Valid values are 1-13; other numbers are recognized as barriers by r.ros.
+# % gisprompt: old,cell,raster
+# %end
+# %option
+# % key: moisture_1h
+# % type: string
+# % required: no
+# % multiple: yes
+# % key_desc: name
+# % label: Raster map containing the 1-hour fuel moisture (%)
+# % description: Name of an existing raster map layer in the user's current mapset search path containing the 1-hour (<.25") fuel moisture (percentage content multiplied by 100).
+# % gisprompt: old,cell,raster
+# %end
+# %option
+# % key: moisture_10h
+# % type: string
+# % required: no
+# % multiple: yes
+# % key_desc: name
+# % label: Raster map containing the 10-hour fuel moisture (%)
+# % description: Name of an existing raster map layer in the user's current mapset search path containing the 10-hour (.25-1") fuel moisture (percentage content multiplied by 100).
+# % gisprompt: old,cell,raster
+# %end
+# %option
+# % key: moisture_100h
+# % type: string
+# % required: no
+# % multiple: yes
+# % key_desc: name
+# % label: Raster map containing the 100-hour fuel moisture (%)
+# % description: Name of an existing raster map layer in the user's current mapset search path containing the 100-hour (1-3") fuel moisture (percentage content multiplied by 100).
+# % gisprompt: old,cell,raster
+# %end
+# %option
+# % key: moisture_live
+# % type: string
+# % required: yes
+# % multiple: yes
+# % key_desc: name
+# % label: Raster map containing live fuel moisture (%)
+# % description: Name of an existing raster map layer in the user's current mapset search path containing live (herbaceous) fuel moisture (percentage content multiplied by 100).
+# % gisprompt: old,cell,raster
+# %end
+# %option
+# % key: direction
+# % type: string
+# % required: no
+# % multiple: yes
+# % key_desc: name
+# % label: Name of raster map containing wind directions (degree)
+# % description: Name of an existing raster map layer in the user's current mapset search path containing wind direction, clockwise from north (degree).
+# % gisprompt: old,cell,raster
+# %end
+# %option
+# % key: slope
+# % type: string
+# % required: no
+# % multiple: no
+# % key_desc: name
+# % label: Name of raster map containing slope (degree)
+# % description: Name of an existing raster map layer in the user's current mapset search path containing topographic slope (degree).
+# % gisprompt: old,cell,raster
+# %end
+# %option
+# % key: aspect
+# % type: string
+# % required: no
+# % multiple: no
+# % key_desc: name
+# % label: Raster map containing aspect (degree, CCW from E)
+# % description: Name of an existing raster map layer in the user's current mapset search path containing topographic aspect, counterclockwise from east (GRASS convention) in degrees.
+# % gisprompt: old,cell,raster
+# %end
+# %option
+# % key: elevation
+# % type: string
+# % required: no
+# % multiple: no
+# % key_desc: name
+# % label: Raster map containing elevation (m, required with -s)
+# % description: Name of an existing raster map layer in the user's current mapset search path containing elevation (meters). Option is required from spotting distance computation (when -s flag is enabled)
+# % gisprompt: old,cell,raster
+# % guisection: Spotting
+# %end
+# %option
+# % key: speed
+# % type: string
+# % required: no
+# % multiple: no
+# % key_desc: name
+# % description: Name of an existing raster map layer in the user's current mapset search path containing wind velocities at half of the average flame height (feet/minute).
+# % gisprompt: old,cell,raster
+# %end
 
 """
 Created on Wed Mar 19 20:59:06 2014
@@ -203,12 +201,13 @@ Created on Wed Mar 19 20:59:06 2014
 """
 
 import sys
+from math import log
 
 import grass.script.core as gcore
 from grass.script.core import run_command, write_command
 
 # print-only version of run_command for debugging
-#def run_command(*args, **kwargs):
+# def run_command(*args, **kwargs):
 #    command = ''
 #    for arg in args:
 #        command += arg + ' '
@@ -244,8 +243,10 @@ def determine_simulation_times(time_step, max_time, change_times):
     current_change_time_index = 0
     next_change_time = change_times[current_change_time_index + 1]
     while current_time < max_time:
-        if next_change_time > current_time and \
-           next_change_time < current_time + time_step:
+        if (
+            next_change_time > current_time
+            and next_change_time < current_time + time_step
+        ):
             simulation_times.append(next_change_time)
             if current_change_time_index + 1 < len(change_times):
                 current_change_time_index += 1
@@ -266,7 +267,7 @@ def times_to_intervals(simulation_times):
     intervals = []
     for i in range(len(simulation_times)):
         if i < len(simulation_times) - 1:
-            interval = (simulation_times[i], simulation_times[i+1])
+            interval = (simulation_times[i], simulation_times[i + 1])
             intervals.append(interval)
     return intervals
 
@@ -282,18 +283,18 @@ def data_for_intervals(intervals, data_times):
     """
     interval_data = []
     i = 0
-    #for j in range(j, len(intervals)):
+    # for j in range(j, len(intervals)):
     for interval in intervals:
-        #if data_times[i] == intervals[j][0]:
+        # if data_times[i] == intervals[j][0]:
         if data_times[i] == interval[0]:
-            #print "eq", data_times[i], intervals[j][0]
+            # print "eq", data_times[i], intervals[j][0]
             interval_data.append(data_times[i])
             current_data = data_times[i]
             if i + 1 < len(data_times):
                 i += 1
-            #print i
+            # print i
         else:
-            #print "nq", data_times[i], intervals[j][0]
+            # print "nq", data_times[i], intervals[j][0]
             interval_data.append(current_data)
     return interval_data
 
@@ -309,32 +310,29 @@ def data_indexes_for_intervals(intervals, data_times):
     """
     indexes = []
     i = 0
-    #for j in range(j, len(intervals)):
+    # for j in range(j, len(intervals)):
     for interval in intervals:
-        #if data_times[i] == intervals[j][0]:
+        # if data_times[i] == intervals[j][0]:
         if data_times[i] == interval[0]:
-            #print "eq", data_times[i], intervals[j][0]
+            # print "eq", data_times[i], intervals[j][0]
             indexes.append(i)
             current_data = i
             if i + 1 < len(data_times):
                 i += 1
-            #print i
+            # print i
         else:
-            #print "nq", data_times[i], intervals[j][0]
+            # print "nq", data_times[i], intervals[j][0]
             indexes.append(current_data)
     return indexes
 
 
-from math import log
-
-
-def number_lenght(number):
+def number_length(number):
     """
-    >>> number_lenght(239)
+    >>> number_length(239)
     3
-    >>> number_lenght(46)
+    >>> number_length(46)
     2
-    >>> number_lenght(7)
+    >>> number_length(7)
     1
     """
     return int(log(number, 10)) + 1
@@ -349,8 +347,8 @@ def format_order(number, zeros):
     >>> format_order(5269, 4)
     '5269'
     >>> numbers = [5, 56, 8547, 189, 0]
-    >>> lenght = number_lenght(max(numbers))
-    >>> [format_order(number, lenght) for number in numbers]
+    >>> length = number_length(max(numbers))
+    >>> [format_order(number, length) for number in numbers]
     ['0005', '0056', '8547', '0189', '0000']
     """
     return str(number).zfill(zeros)
@@ -367,28 +365,37 @@ def output_names_for_intervals(basename, intervals):
     """
     names = []
     maximum = intervals[-1][1]
-#    print maximum
-    lenght = number_lenght(maximum)
- #   print lenght
+    #    print maximum
+    length = number_length(maximum)
+    #   print length
     for interval in intervals:
-        names.append(basename + '_' + format_order(interval[1], lenght))
+        names.append(basename + "_" + format_order(interval[1], length))
     return names
 
 
 # named tuple version of the class bellow
-#FireSimulationParams = namedtuple('FireSimulationParams',
+# FireSimulationParams = namedtuple('FireSimulationParams',
 #                                  'model moistures_live '
 #                                  'moistures_1h moistures_10h moistures_100h '
 #                                  'wind_directions wind_velocities '
 #                                  'slope aspect elevation '
 #                                  'start_raster')
 class FireSimulationParams:
-    def __init__(self, model=None, moistures_live=None,
-                 moistures_1h=None, moistures_10h=None, moistures_100h=None,
-                 wind_directions=None, wind_velocities=None,
-                 slope=None, aspect=None, elevation=None,
-                 start_raster=None,
-                 spotting=None):
+    def __init__(
+        self,
+        model=None,
+        moistures_live=None,
+        moistures_1h=None,
+        moistures_10h=None,
+        moistures_100h=None,
+        wind_directions=None,
+        wind_velocities=None,
+        slope=None,
+        aspect=None,
+        elevation=None,
+        start_raster=None,
+        spotting=None,
+    ):
         self.spotting = spotting
         self.model = model
         self.moistures_live = moistures_live
@@ -419,136 +426,160 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
     start_raster = params.start_raster
     # TODO: clean the tmp maps: g.mremove rast="rfirespread_rros_out*" -f
     # r.ros output raster maps (.base, .max, .maxdir, .spotdist)
-    ros_basename = 'rfirespread_rros_out'
-    ros_base = ros_basename + '.base'
-    ros_max = ros_basename + '.max'
-    ros_maxdir = ros_basename + '.maxdir'
-    ros_spotdist = ros_basename + '.spotdist' if params.spotting else None
-    rros_params = dict(model=params.model,
-                       slope=params.slope, aspect=params.aspect,
-                       elevation=params.elevation,
-                       base_ros=ros_base,
-                       max_ros=ros_max,
-                       direction_ros=ros_maxdir)
+    ros_basename = "rfirespread_rros_out"
+    ros_base = ros_basename + ".base"
+    ros_max = ros_basename + ".max"
+    ros_maxdir = ros_basename + ".maxdir"
+    ros_spotdist = ros_basename + ".spotdist" if params.spotting else None
+    rros_params = dict(
+        model=params.model,
+        slope=params.slope,
+        aspect=params.aspect,
+        elevation=params.elevation,
+        base_ros=ros_base,
+        max_ros=ros_max,
+        direction_ros=ros_maxdir,
+    )
     if ros_spotdist:
-        rros_params['spotting_distance'] = ros_spotdist
+        rros_params["spotting_distance"] = ros_spotdist
     rspread_params = dict(max_ros=ros_max, direction_ros=ros_maxdir, base_ros=ros_base)
 
     first_run = True
     for index, interval in enumerate(simulation_intervals):
         # print ">>>>>>>>>", index, interval, params.model, params.moistures_100h[data_indexes[index]], params.wind_directions[data_indexes[index]], params.wind_velocities[data_indexes[index]]
         # TODO: change the print to message
-        rros_params['moisture_live'] = params.moistures_live[data_indexes[index]]
+        rros_params["moisture_live"] = params.moistures_live[data_indexes[index]]
         if params.moistures_1h:
-            rros_params['moisture_1h'] = params.moistures_1h[data_indexes[index]]
+            rros_params["moisture_1h"] = params.moistures_1h[data_indexes[index]]
         if params.moistures_10h:
-            rros_params['moisture_10h'] = params.moistures_10h[data_indexes[index]]
+            rros_params["moisture_10h"] = params.moistures_10h[data_indexes[index]]
         if params.moistures_100h:
-            rros_params['moisture_100h'] = params.moistures_100h[data_indexes[index]]
+            rros_params["moisture_100h"] = params.moistures_100h[data_indexes[index]]
         if params.wind_directions:
-            rros_params['direction'] = params.wind_directions[data_indexes[index]]
+            rros_params["direction"] = params.wind_directions[data_indexes[index]]
         if params.wind_velocities:
-            rros_params['velocity'] = params.wind_velocities[data_indexes[index]]
-        ret = run_command('r.ros', **rros_params)
+            rros_params["velocity"] = params.wind_velocities[data_indexes[index]]
+        ret = run_command("r.ros", **rros_params)
 
         if ret != 0:
             gcore.fatal(_("r.ros failed. Please check above error messages."))
         if first_run:
-            rspread_flags = ''
+            rspread_flags = ""
             first_run = False
         else:
-            rspread_flags = 'i'
+            rspread_flags = "i"
         if params.spotting:
-            rspread_flags += 's'
-            rspread_params['spotting_distance'] = ros_spotdist
-            rspread_params['wind_speed'] = params.wind_velocities[data_indexes[index]]
-            rspread_params['fuel_moisture'] = params.moistures_1h[data_indexes[index]]
+            rspread_flags += "s"
+            rspread_params["spotting_distance"] = ros_spotdist
+            rspread_params["wind_speed"] = params.wind_velocities[data_indexes[index]]
+            rspread_params["fuel_moisture"] = params.moistures_1h[data_indexes[index]]
 
-        rspread_params.update(dict(start=start_raster, output=outputs[index],
-                                   init_time=interval[0],
-                                   lag=interval[1] - interval[0]))
-        ret = run_command('r.spread', flags=rspread_flags, **rspread_params)
+        rspread_params.update(
+            dict(
+                start=start_raster,
+                output=outputs[index],
+                init_time=interval[0],
+                lag=interval[1] - interval[0],
+            )
+        )
+        ret = run_command("r.spread", flags=rspread_flags, **rspread_params)
 
         if ret != 0:
             gcore.fatal(_("r.spread failed. Please check above error messages."))
         rast_to_remove = [ros_base, ros_max, ros_maxdir]
         if params.spotting:
             rast_to_remove.append(ros_spotdist)
-        ret = run_command('g.remove', type='raster', name=rast_to_remove, flags='f')
+        ret = run_command("g.remove", type="raster", name=rast_to_remove, flags="f")
         if ret != 0:
-            gcore.fatal(_("g.remove failed when cleaning after r.ros and r.spread."
-                          " This might mean the error of programmer or unexpected behavior of one of the modules."
-                          " Please check above error messages."))
-        ret = run_command('r.null', map=outputs[index], setnull=0)
+            gcore.fatal(
+                _(
+                    "g.remove failed when cleaning after r.ros and r.spread."
+                    " This might mean the error of programmer"
+                    " or unexpected behavior of one of the modules."
+                    " Please check above error messages."
+                )
+            )
+        ret = run_command("r.null", map=outputs[index], setnull=0)
         if ret != 0:
             gcore.fatal(_("r.null failed. Please check above error messages."))
-        ret = write_command('r.colors', map=outputs[index], rules='-',
-                            stdin="""
+        ret = write_command(
+            "r.colors",
+            map=outputs[index],
+            rules="-",
+            stdin="""
                             0% 50:50:50
                             60% yellow
                             100% red
-                            """)
+                            """,
+        )
         if ret != 0:
             gcore.fatal(_("r.colors failed. Please check above error messages."))
         start_raster = outputs[index]
 
 
 def main():
-
+    """Process command line parameters and run the simulation"""
     sim_params = FireSimulationParams()
 
     options, flags = gcore.parser()
 
-    sim_params.model = options['model']
-    sim_params.moistures_live = options['moisture_live'].split(',')
-    if options['moisture_1h']:
-        sim_params.moistures_1h = options['moisture_1h'].split(',')
+    sim_params.model = options["model"]
+    sim_params.moistures_live = options["moisture_live"].split(",")
+    if options["moisture_1h"]:
+        sim_params.moistures_1h = options["moisture_1h"].split(",")
     else:
         sim_params.moistures_1h = None
-    if options['moisture_10h']:
-        sim_params.moistures_10h = options['moisture_10h'].split(',')
+    if options["moisture_10h"]:
+        sim_params.moistures_10h = options["moisture_10h"].split(",")
     else:
         sim_params.moistures_10h = None
-    if options['moisture_100h']:
-        sim_params.moistures_100h = options['moisture_100h'].split(',')
+    if options["moisture_100h"]:
+        sim_params.moistures_100h = options["moisture_100h"].split(",")
     else:
         sim_params.moistures_100h = None
-    if options['direction']:
-        sim_params.wind_directions = options['direction'].split(',')
+    if options["direction"]:
+        sim_params.wind_directions = options["direction"].split(",")
     else:
         sim_params.wind_directions = None
-    if options['speed']:
-        sim_params.wind_velocities = options['speed'].split(',')
+    if options["speed"]:
+        sim_params.wind_velocities = options["speed"].split(",")
     else:
         sim_params.wind_velocities = None
 
-    if not sim_params.moistures_1h and not sim_params.moistures_10h and \
-       not sim_params.moistures_100h:
-        gcore.fatal(_("No dead fuel moisture is given."
-                      " At least one of the 1-h, 10-h, 100-h"
-                      " moisture layers is required."))
+    if (
+        not sim_params.moistures_1h
+        and not sim_params.moistures_10h
+        and not sim_params.moistures_100h
+    ):
+        gcore.fatal(
+            _(
+                "No dead fuel moisture is given."
+                " At least one of the 1-h, 10-h, 100-h"
+                " moisture layers is required."
+            )
+        )
 
-    sim_params.slope = options['slope']
-    sim_params.aspect = options['aspect']
-    sim_params.elevation = options['elevation']
+    sim_params.slope = options["slope"]
+    sim_params.aspect = options["aspect"]
+    sim_params.elevation = options["elevation"]
 
-    sim_params.spotting = flags['s']
+    sim_params.spotting = flags["s"]
     if sim_params.spotting and not sim_params.elevation:
         gcore.fatal(_("Spotting requires elevation option"))
-    #elif not sim_params.spotting and sim_params.elevation:
+    # elif not sim_params.spotting and sim_params.elevation:
     #    gcore.message(_("Elevation option used but is ignored when no spotting"
     #                    " is requested"))
     if sim_params.spotting and not sim_params.moistures_1h:
         gcore.fatal(_("Spotting requires moisture_1h option (fine fuel)"))
 
-    sim_params.start_raster = options['start']
-    basename = options['output']
+    sim_params.start_raster = options["start"]
+    basename = options["output"]
 
     # TODO: add handling of 0 (or 1?) at the beginning of times
     # TODO: check if times and maps has the same sizes
     # TODO: check if multiple things are multiple
-    # TODO: resolve inconsitency in speed vs velocity in code
-    # TODO: resolve inconsitency in speed vs velocity r.ros and r.spread
+    # TODO: resolve inconsistency in speed vs velocity in code
+    # TODO: resolve inconsistency in speed vs velocity r.ros and r.spread
     # TODO: create convention for plural for options with multiple
     # TODO: add advanced r.spread options
     # TODO: handle non-zero start time
@@ -557,20 +588,29 @@ def main():
     # TODO: compute missing moisture_1h when doing spotting and other are available
     # TODO: unique tmp map names and clean the map on error
     # TODO: delete the maps which were not requested, perhaps create a flag
-    # TODO: reqister output as strds
-    # TODO: accept strds as input
+    # TODO: register output as space time raster dataset
+    # TODO: accept space time raster dataset as input
 
-    change_times = [int(i) for i in options['times'].split(',')]
-    max_time = int(options['end_time'])
-    time_step = int(options['time_step'])
+    change_times = [int(i) for i in options["times"].split(",")]
+    max_time = int(options["end_time"])
+    time_step = int(options["time_step"])
 
     number_of_changes = len(change_times)
-    for i in [sim_params.moistures_live, sim_params.moistures_1h, sim_params.moistures_10h, sim_params.moistures_100h, sim_params.wind_directions, sim_params.wind_velocities]:
+    for i in [
+        sim_params.moistures_live,
+        sim_params.moistures_1h,
+        sim_params.moistures_10h,
+        sim_params.moistures_100h,
+        sim_params.wind_directions,
+        sim_params.wind_velocities,
+    ]:
         # here allowing None as valid state
         if i is not None and len(i) != number_of_changes:
-            gcore.fatal(_("Lenghts does not match:"
-                          " times={t}, maps are {i}").format(t=number_of_changes,
-                                                             i=i))
+            gcore.fatal(
+                _("Lengths does not match:" " times={t}, maps are {i}").format(
+                    t=number_of_changes, i=i
+                )
+            )
             # TODO: make this one by one to make it informative
 
     export_times = range(0, max_time + 1, time_step)
@@ -589,8 +629,9 @@ def main():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) == 2 and sys.argv[1] == 'doctest':
+    if len(sys.argv) == 2 and sys.argv[1] == "doctest":
         import doctest
+
         doctest.testmod()
     else:
         sys.exit(main())
