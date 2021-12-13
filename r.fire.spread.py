@@ -203,8 +203,8 @@ Created on Wed Mar 19 20:59:06 2014
 import sys
 from math import log
 
-import grass.script.core as gcore
-from grass.script.core import run_command, write_command
+import grass.script as gs
+from grass.script import run_command, write_command
 
 # print-only version of run_command for debugging
 # def run_command(*args, **kwargs):
@@ -243,10 +243,7 @@ def determine_simulation_times(time_step, max_time, change_times):
     current_change_time_index = 0
     next_change_time = change_times[current_change_time_index + 1]
     while current_time < max_time:
-        if (
-            next_change_time > current_time
-            and next_change_time < current_time + time_step
-        ):
+        if current_time < next_change_time < current_time + time_step:
             simulation_times.append(next_change_time)
             if current_change_time_index + 1 < len(change_times):
                 current_change_time_index += 1
@@ -265,9 +262,9 @@ def times_to_intervals(simulation_times):
     [(0, 4), (4, 5), (5, 8), (8, 9), (9, 12)]
     """
     intervals = []
-    for i in range(len(simulation_times)):
+    for i, time in enumerate(simulation_times):
         if i < len(simulation_times) - 1:
-            interval = (simulation_times[i], simulation_times[i + 1])
+            interval = (time, simulation_times[i + 1])
             intervals.append(interval)
     return intervals
 
@@ -462,7 +459,7 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
         ret = run_command("r.ros", **rros_params)
 
         if ret != 0:
-            gcore.fatal(_("r.ros failed. Please check above error messages."))
+            gs.fatal(_("r.ros failed. Please check above error messages."))
         if first_run:
             rspread_flags = ""
             first_run = False
@@ -485,13 +482,13 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
         ret = run_command("r.spread", flags=rspread_flags, **rspread_params)
 
         if ret != 0:
-            gcore.fatal(_("r.spread failed. Please check above error messages."))
+            gs.fatal(_("r.spread failed. Please check above error messages."))
         rast_to_remove = [ros_base, ros_max, ros_maxdir]
         if params.spotting:
             rast_to_remove.append(ros_spotdist)
         ret = run_command("g.remove", type="raster", name=rast_to_remove, flags="f")
         if ret != 0:
-            gcore.fatal(
+            gs.fatal(
                 _(
                     "g.remove failed when cleaning after r.ros and r.spread."
                     " This might mean the error of programmer"
@@ -501,7 +498,7 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
             )
         ret = run_command("r.null", map=outputs[index], setnull=0)
         if ret != 0:
-            gcore.fatal(_("r.null failed. Please check above error messages."))
+            gs.fatal(_("r.null failed. Please check above error messages."))
         ret = write_command(
             "r.colors",
             map=outputs[index],
@@ -513,7 +510,7 @@ def simulate_fire(params, simulation_intervals, data_indexes, outputs):
                             """,
         )
         if ret != 0:
-            gcore.fatal(_("r.colors failed. Please check above error messages."))
+            gs.fatal(_("r.colors failed. Please check above error messages."))
         start_raster = outputs[index]
 
 
@@ -521,7 +518,7 @@ def main():
     """Process command line parameters and run the simulation"""
     sim_params = FireSimulationParams()
 
-    options, flags = gcore.parser()
+    options, flags = gs.parser()
 
     sim_params.model = options["model"]
     sim_params.moistures_live = options["moisture_live"].split(",")
@@ -551,7 +548,7 @@ def main():
         and not sim_params.moistures_10h
         and not sim_params.moistures_100h
     ):
-        gcore.fatal(
+        gs.fatal(
             _(
                 "No dead fuel moisture is given."
                 " At least one of the 1-h, 10-h, 100-h"
@@ -565,12 +562,12 @@ def main():
 
     sim_params.spotting = flags["s"]
     if sim_params.spotting and not sim_params.elevation:
-        gcore.fatal(_("Spotting requires elevation option"))
+        gs.fatal(_("Spotting requires elevation option"))
     # elif not sim_params.spotting and sim_params.elevation:
-    #    gcore.message(_("Elevation option used but is ignored when no spotting"
+    #    gs.message(_("Elevation option used but is ignored when no spotting"
     #                    " is requested"))
     if sim_params.spotting and not sim_params.moistures_1h:
-        gcore.fatal(_("Spotting requires moisture_1h option (fine fuel)"))
+        gs.fatal(_("Spotting requires moisture_1h option (fine fuel)"))
 
     sim_params.start_raster = options["start"]
     basename = options["output"]
@@ -606,7 +603,7 @@ def main():
     ]:
         # here allowing None as valid state
         if i is not None and len(i) != number_of_changes:
-            gcore.fatal(
+            gs.fatal(
                 _("Lengths does not match:" " times={t}, maps are {i}").format(
                     t=number_of_changes, i=i
                 )
