@@ -232,7 +232,7 @@ def determine_simulation_times(time_step, max_time, change_times):
     >>> step = 3
     >>> max_time = 14
     >>> changes = [0, 2, 6, 7]
-    >>> export_times = range(0, max_time, step)
+    >>> export_times = list(range(0, max_time, step))
     >>> sorted(set(export_times + changes))
     [0, 2, 3, 6, 7, 9, 12]
     >>> determine_simulation_times(step, max_time, changes)
